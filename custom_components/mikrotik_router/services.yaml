@@ -1,0 +1,89 @@
+dns_entry_add:
+  name: DNS Eintrag hinzufügen
+  description: Fügt einen statischen DNS-Eintrag im MikroTik Router hinzu.
+  fields:
+    router:
+      description: Config Entry Title (z.B. Mikrotik)
+      required: true
+      selector:
+        text:
+    name:
+      description: Hostname (z.B. server.local.de)
+      required: true
+      selector:
+        text:
+    address:
+      description: IP-Adresse
+      required: true
+      selector:
+        text:
+    ttl:
+      description: TTL (optional, Standard 1d)
+      required: false
+      selector:
+        text:
+    comment:
+      description: Kommentar (optional)
+      required: false
+      selector:
+        text:
+
+dns_entry_delete:
+  name: DNS Eintrag löschen
+  description: Löscht einen statischen DNS-Eintrag aus dem MikroTik Router.
+  fields:
+    router:
+      description: Config Entry Title
+      required: true
+      selector:
+        text:
+    name:
+      description: Hostname des zu löschenden Eintrags
+      required: true
+      selector:
+        text:
+
+dhcp_lease_make_static:
+  name: DHCP Lease statisch machen
+  description: Wandelt einen dynamischen DHCP-Lease in eine statische Reservierung um.
+  fields:
+    router:
+      description: Config Entry Title
+      required: true
+      selector:
+        text:
+    mac_address:
+      description: MAC-Adresse des Geräts
+      required: true
+      selector:
+        text:
+
+dhcp_lease_delete:
+  name: DHCP Lease löschen
+  description: Löscht einen DHCP-Lease aus dem MikroTik Router.
+  fields:
+    router:
+      description: Config Entry Title
+      required: true
+      selector:
+        text:
+    mac_address:
+      description: MAC-Adresse des Geräts
+      required: true
+      selector:
+        text:
+
+script_run:
+  name: Skript ausführen
+  description: Führt ein RouterOS-Skript nach Name aus.
+  fields:
+    router:
+      description: Config Entry Title
+      required: true
+      selector:
+        text:
+    script_name:
+      description: Name des Skripts in RouterOS
+      required: true
+      selector:
+        text:

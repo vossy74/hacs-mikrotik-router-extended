@@ -1142,29 +1142,7 @@ class MikrotikCoordinator(DataUpdateCoordinator[None]):
             only=[{"key": "action", "value": "dst-nat"}],
         )
 
-        # Remove duplicate NAT entries to prevent crash
-        nat_uniq = {}
-        nat_del = {}
-        for uid in self.ds["nat"]:
-            self.ds["nat"][uid]["comment"] = str(self.ds["nat"][uid]["comment"])
-
-            tmp_name = self.ds["nat"][uid]["uniq-id"]
-            if tmp_name not in nat_uniq:
-                nat_uniq[tmp_name] = uid
-            else:
-                nat_del[uid] = 1
-                nat_del[nat_uniq[tmp_name]] = 1
-
-        for uid in nat_del:
-            if self.ds["nat"][uid]["uniq-id"] not in self.nat_removed:
-                self.nat_removed[self.ds["nat"][uid]["uniq-id"]] = 1
-                _LOGGER.error(
-                    "Mikrotik %s duplicate NAT rule %s, entity will be unavailable.",
-                    self.host,
-                    self.ds["nat"][uid]["name"],
-                )
-
-            del self.ds["nat"][uid]
+        self._disambiguate_rules("nat", self.nat_removed, "NAT")
 
         self._merge_firewall_stats("nat", "/ip/firewall/nat")
 
@@ -1237,29 +1215,7 @@ class MikrotikCoordinator(DataUpdateCoordinator[None]):
             ],
         )
 
-        # Remove duplicate Mangle entries to prevent crash
-        mangle_uniq = {}
-        mangle_del = {}
-        for uid in self.ds["mangle"]:
-            self.ds["mangle"][uid]["comment"] = str(self.ds["mangle"][uid]["comment"])
-
-            tmp_name = self.ds["mangle"][uid]["uniq-id"]
-            if tmp_name not in mangle_uniq:
-                mangle_uniq[tmp_name] = uid
-            else:
-                mangle_del[uid] = 1
-                mangle_del[mangle_uniq[tmp_name]] = 1
-
-        for uid in mangle_del:
-            if self.ds["mangle"][uid]["uniq-id"] not in self.mangle_removed:
-                self.mangle_removed[self.ds["mangle"][uid]["uniq-id"]] = 1
-                _LOGGER.error(
-                    "Mikrotik %s duplicate Mangle rule %s, entity will be unavailable.",
-                    self.host,
-                    self.ds["mangle"][uid]["name"],
-                )
-
-            del self.ds["mangle"][uid]
+        self._disambiguate_rules("mangle", self.mangle_removed, "Mangle")
 
         self._merge_firewall_stats("mangle", "/ip/firewall/mangle")
 
@@ -1292,6 +1248,8 @@ class MikrotikCoordinator(DataUpdateCoordinator[None]):
                 {"name": "layer7-protocol", "default": "any"},
                 {"name": "connection-state", "default": "any"},
                 {"name": "tcp-flags", "default": "any"},
+                {"name": "ipsec-policy", "default": ""},
+                {"name": "icmp-options", "default": ""},
                 {
                     "name": "enabled",
                     "source": "disabled",
@@ -1348,32 +1306,56 @@ class MikrotikCoordinator(DataUpdateCoordinator[None]):
             ],
         )
 
-        # Remove duplicate filter entries to prevent crash
-        filter_uniq = {}
-        filter_del = {}
-        for uid in self.ds["filter"]:
-            self.ds["filter"][uid]["comment"] = str(self.ds["filter"][uid]["comment"])
-
-            tmp_name = self.ds["filter"][uid]["uniq-id"]
-            if tmp_name not in filter_uniq:
-                filter_uniq[tmp_name] = uid
-            else:
-                filter_del[uid] = 1
-                filter_del[filter_uniq[tmp_name]] = 1
-
-        for uid in filter_del:
-            if self.ds["filter"][uid]["uniq-id"] not in self.filter_removed:
-                self.filter_removed[self.ds["filter"][uid]["uniq-id"]] = 1
-                _LOGGER.error(
-                    "Mikrotik %s duplicate Filter rule %s (ID %s), entity will be unavailable.",
-                    self.host,
-                    self.ds["filter"][uid]["name"],
-                    self.ds["filter"][uid][".id"],
-                )
-
-            del self.ds["filter"][uid]
+        self._disambiguate_rules("filter", self.filter_removed, "filter")
 
         self._merge_firewall_stats("filter", "/ip/firewall/filter")
+
+    # ---------------------------
+    #   _disambiguate_rules
+    # ---------------------------
+    def _disambiguate_rules(self, ds_key: str, logged: dict, label: str) -> None:
+        """Give rules that share a uniq-id a distinct one instead of dropping them.
+
+        Rules whose uniq-id is unique keep it unchanged (stable entity ids).
+        Colliding rules are told apart by fields the uniq-id ignores
+        (ipsec-policy, icmp-options) and, as last resort, by the rule .id.
+        """
+        groups = {}
+        for uid, entry in self.ds[ds_key].items():
+            entry["comment"] = str(entry.get("comment", ""))
+            groups.setdefault(entry["uniq-id"], []).append(uid)
+
+        for base, uids in groups.items():
+            if len(uids) < 2:
+                continue
+            for uid in uids:
+                entry = self.ds[ds_key][uid]
+                extra = "|".join(
+                    str(entry[k])
+                    for k in ("ipsec-policy", "icmp-options")
+                    if entry.get(k)
+                )
+                if extra:
+                    entry["uniq-id"] = f"{base}|{extra}"
+
+            seen = {}
+            for uid in uids:
+                seen.setdefault(self.ds[ds_key][uid]["uniq-id"], []).append(uid)
+            for new_id, same in seen.items():
+                if len(same) < 2:
+                    continue
+                for uid in same:
+                    entry = self.ds[ds_key][uid]
+                    entry["uniq-id"] = f"{new_id}|{entry['.id']}"
+                if new_id not in logged:
+                    logged[new_id] = 1
+                    _LOGGER.warning(
+                        "Mikrotik %s: %d identical %s rules %s, using rule id to tell them apart.",
+                        self.host,
+                        len(same),
+                        label,
+                        self.ds[ds_key][same[0]].get("name"),
+                    )
 
     # ---------------------------
     #   _merge_firewall_stats

@@ -5,10 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List
 
+from homeassistant.components.device_tracker import ScannerEntityDescription
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
-from homeassistant.components.switch import (
-    SwitchEntityDescription,
-)
 
 DEVICE_ATTRIBUTES_HOST = [
     "interface",
@@ -23,8 +21,8 @@ DEVICE_ATTRIBUTES_HOST = [
 ]
 
 
-@dataclass
-class MikrotikDeviceTrackerEntityDescription(SwitchEntityDescription):
+@dataclass(frozen=True, kw_only=True)
+class MikrotikDeviceTrackerEntityDescription(ScannerEntityDescription):
     """Class describing mikrotik entities."""
 
     key: str | None = None
@@ -65,6 +63,7 @@ SENSOR_TYPES: tuple[MikrotikDeviceTrackerEntityDescription, ...] = (
 
 SENSOR_SERVICES = {}
 
-# DHCP lease tracker types
+# DHCP lease tracker types added after host tracker so DHCP gets _2 suffix
+# when same hostname exists — DHCP tracker is more stable for presence detection
 from .dhcp_types import SENSOR_TYPES as _DHCP_SENSOR_TYPES
 SENSOR_TYPES = SENSOR_TYPES + _DHCP_SENSOR_TYPES

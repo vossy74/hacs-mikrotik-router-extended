@@ -5,15 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List
 
+from homeassistant.components.device_tracker import ScannerEntityDescription
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
-from homeassistant.components.switch import SwitchEntityDescription
 
 from .const import DOMAIN
 
 DEVICE_ATTRIBUTES_DHCP_LEASE = [
     "address",
     "host-name",
-    "type",
+    "dynamic",
     "expires-after",
     "server",
     "interface",
@@ -22,8 +22,8 @@ DEVICE_ATTRIBUTES_DHCP_LEASE = [
 ]
 
 
-@dataclass
-class MikrotikDHCPTrackerEntityDescription(SwitchEntityDescription):
+@dataclass(frozen=True, kw_only=True)
+class MikrotikDHCPTrackerEntityDescription(ScannerEntityDescription):
     """Class describing mikrotik DHCP tracker entities."""
 
     key: str | None = None
